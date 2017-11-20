@@ -82,7 +82,6 @@ void forward_detection_layer(const detection_layer l, network net)
                 for (j = 0; j < l.n; ++j) {
                     int p_index = index + locations*l.classes + i*l.n + j;
                     l.delta[p_index] = l.noobject_scale*(0 - l.output[p_index]);
-                    *(l.cost) += l.noobject_scale*pow(l.output[p_index], 2);
                     avg_anyobj += l.output[p_index];
                 }
 
@@ -97,7 +96,6 @@ void forward_detection_layer(const detection_layer l, network net)
                 int class_index = index + i*l.classes;
                 for(j = 0; j < l.classes; ++j) {
                     l.delta[class_index+j] = l.class_scale * (net.truth[truth_index+1+j] - l.output[class_index+j]);
-                    *(l.cost) += l.class_scale * pow(net.truth[truth_index+1+j] - l.output[class_index+j], 2);
                     if(net.truth[truth_index + 1 + j]) avg_cat += l.output[class_index+j];
                     avg_allcat += l.output[class_index+j];
                 }
@@ -158,8 +156,6 @@ void forward_detection_layer(const detection_layer l, network net)
 
                 //printf("%d,", best_index);
                 int p_index = index + locations*l.classes + i*l.n + best_index;
-                *(l.cost) -= l.noobject_scale * pow(l.output[p_index], 2);
-                *(l.cost) += l.object_scale * pow(1-l.output[p_index], 2);
                 avg_obj += l.output[p_index];
                 l.delta[p_index] = l.object_scale * (1.-l.output[p_index]);
 
@@ -176,36 +172,9 @@ void forward_detection_layer(const detection_layer l, network net)
                     l.delta[box_index+3] = l.coord_scale*(sqrt(net.truth[tbox_index + 3]) - l.output[box_index + 3]);
                 }
 
-                *(l.cost) += pow(1-iou, 2);
                 avg_iou += iou;
                 ++count;
             }
-        }
-
-        if(0){
-            float *costs = calloc(l.batch*locations*l.n, sizeof(float));
-            for (b = 0; b < l.batch; ++b) {
-                int index = b*l.inputs;
-                for (i = 0; i < locations; ++i) {
-                    for (j = 0; j < l.n; ++j) {
-                        int p_index = index + locations*l.classes + i*l.n + j;
-                        costs[b*locations*l.n + i*l.n + j] = l.delta[p_index]*l.delta[p_index];
-                    }
-                }
-            }
-            int indexes[100];
-            top_k(costs, l.batch*locations*l.n, 100, indexes);
-            float cutoff = costs[indexes[99]];
-            for (b = 0; b < l.batch; ++b) {
-                int index = b*l.inputs;
-                for (i = 0; i < locations; ++i) {
-                    for (j = 0; j < l.n; ++j) {
-                        int p_index = index + locations*l.classes + i*l.n + j;
-                        if (l.delta[p_index]*l.delta[p_index] < cutoff) l.delta[p_index] = 0;
-                    }
-                }
-            }
-            free(costs);
         }
 
 
