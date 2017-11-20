@@ -10,6 +10,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#define MAX_TRUTHS 600
+
 layer make_region_layer(int batch, int w, int h, int n, int classes, int coords)
 {
     layer l = {0};
@@ -30,7 +32,7 @@ layer make_region_layer(int batch, int w, int h, int n, int classes, int coords)
     l.bias_updates = calloc(n*2, sizeof(float));
     l.outputs = h*w*n*(classes + coords + 1);
     l.inputs = l.outputs;
-    l.truths = 30*(l.coords + 1);
+    l.truths = MAX_TRUTHS*(l.coords + 1);
     l.delta = calloc(batch*l.outputs, sizeof(float));
     l.output = calloc(batch*l.outputs, sizeof(float));
     int i;
@@ -198,7 +200,7 @@ void forward_region_layer(const layer l, network net)
     for (b = 0; b < l.batch; ++b) {
         if(l.softmax_tree){
             int onlyclass = 0;
-            for(t = 0; t < 30; ++t){
+            for(t = 0; t < MAX_TRUTHS; ++t){
                 box truth = float_to_box(net.truth + t*(l.coords + 1) + b*l.truths, 1);
                 if(!truth.x) break;
                 int class = net.truth[t*(l.coords + 1) + b*l.truths + l.coords];
@@ -235,7 +237,7 @@ void forward_region_layer(const layer l, network net)
                     int box_index = entry_index(l, b, n*l.w*l.h + j*l.w + i, 0);
                     box pred = get_region_box(l.output, l.biases, n, box_index, i, j, l.w, l.h, l.w*l.h);
                     float best_iou = 0;
-                    for(t = 0; t < 30; ++t){
+                    for(t = 0; t < MAX_TRUTHS; ++t){
                         box truth = float_to_box(net.truth + t*(l.coords + 1) + b*l.truths, 1);
                         if(!truth.x) break;
                         float iou = box_iou(pred, truth);
@@ -262,7 +264,7 @@ void forward_region_layer(const layer l, network net)
                 }
             }
         }
-        for(t = 0; t < 30; ++t){
+        for(t = 0; t < MAX_TRUTHS; ++t){
             box truth = float_to_box(net.truth + t*(l.coords + 1) + b*l.truths, 1);
 
             if(!truth.x) break;
@@ -353,8 +355,8 @@ void correct_region_boxes(box *boxes, int n, int w, int h, int netw, int neth, i
     }
     for (i = 0; i < n; ++i){
         box b = boxes[i];
-        b.x =  (b.x - (netw - new_w)/2./netw) / ((float)new_w/netw); 
-        b.y =  (b.y - (neth - new_h)/2./neth) / ((float)new_h/neth); 
+        b.x =  (b.x - (netw - new_w)/2./netw) / ((float)new_w/netw);
+        b.y =  (b.y - (neth - new_h)/2./neth) / ((float)new_h/neth);
         b.w *= (float)netw/new_w;
         b.h *= (float)neth/new_h;
         if(!relative){
@@ -436,9 +438,9 @@ void get_region_boxes(layer l, int w, int h, int netw, int neth, float thresh, f
                     probs[index][j] = (prob > thresh) ? prob : 0;
                     if(prob > max) max = prob;
                     // TODO REMOVE
-                    // if (j == 56 ) probs[index][j] = 0; 
+                    // if (j == 56 ) probs[index][j] = 0;
                     /*
-                       if (j != 0) probs[index][j] = 0; 
+                       if (j != 0) probs[index][j] = 0;
                        int blacklist[] = {121, 497, 482, 504, 122, 518,481, 418, 542, 491, 914, 478, 120, 510,500};
                        int bb;
                        for (bb = 0; bb < sizeof(blacklist)/sizeof(int); ++bb){
@@ -509,7 +511,7 @@ void forward_region_layer_gpu(const layer l, network net)
         }
         cudaDeviceSynchronize();
         printf("Good GPU Timing: %f\n", what_time_is_it_now() - then);
-        } 
+        }
         {
         double then = what_time_is_it_now();
         for(zz = 0; zz < number; ++zz){
